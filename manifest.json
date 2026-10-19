@@ -1,0 +1,16 @@
+{
+  "name": "KMTT Walkability Survey",
+  "short_name": "KMTT Walkability",
+  "description": "Offline-first pedestrian interview for the KMTT walkability study: one form per interview, GPS saved with each.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

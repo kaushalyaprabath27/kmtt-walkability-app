@@ -21,7 +21,8 @@ const CONFIG = Object.assign({
 
 const PLACEHOLDER_URL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE';
 const SURVEY_TYPE = 'kmtt-walkability';
-const SYNC_ACTION = 'submit_kmtt_v1';
+// v2: bus terminal + route on entry / exit by bus; notes under barriers and improvements.
+const SYNC_ACTION = 'submit_kmtt_v2';
 const BATCH_SIZE = 50;
 const SYNC_INTERVAL_MS = 15000;
 
@@ -169,10 +170,29 @@ const FORM = [
         id: 'entryMode', label: 'What mode did you use to enter the study area?', type: 'single', other: true, grid: true,
         hint: 'If several, the last mode before entering', options: MODES
     },
+    // Bus terminal and route: asked only when they enter / leave by bus.
+    {
+        id: 'entryBusTerminal', label: 'Bus terminal where they got off', type: 'place', presets: true, nearby: true, recent: true, recentGroup: 'busTerminal',
+        icon: 'fa-bus-simple', showIf: a => a.entryMode === 'Bus', hint: 'Arrived by bus', placeholder: 'Start typing a bus terminal / stand'
+    },
+    {
+        id: 'entryBusRoute', label: 'Bus route they came on', type: 'place', presets: 'busRoutes', presetSub: 'Bus route', mapSearch: false, cityRoutes: 'from',
+        recent: true, recentGroup: 'busRoute', icon: 'fa-bus',
+        showIf: a => a.entryMode === 'Bus', hint: 'e.g. Colombo – Kandy', placeholder: 'Type a town, e.g. Colombo'
+    },
     {
         id: 'exitMode', label: 'How do you expect to leave the study area on this trip?', type: 'single', other: true, grid: true,
         hint: 'If several, the first mode after leaving',
         options: [['Walk all the way', 'fa-person-walking']].concat(MODES.slice(1), [['Not yet decided', 'fa-circle-question']])
+    },
+    {
+        id: 'exitBusTerminal', label: 'Bus terminal where they will board', type: 'place', presets: true, nearby: true, recent: true, recentGroup: 'busTerminal',
+        icon: 'fa-bus-simple', showIf: a => a.exitMode === 'Bus', hint: 'Leaving by bus', placeholder: 'Start typing a bus terminal / stand'
+    },
+    {
+        id: 'exitBusRoute', label: 'Bus route they will take', type: 'place', presets: 'busRoutes', presetSub: 'Bus route', mapSearch: false, cityRoutes: 'to',
+        recent: true, recentGroup: 'busRoute', icon: 'fa-bus',
+        showIf: a => a.exitMode === 'Bus', hint: 'e.g. Kandy – Kurunegala', placeholder: 'Type a town, e.g. Kurunegala'
     },
     {
         id: 'entryFacility', label: 'Where did you board, alight, park or get dropped off? (entry)', type: 'multi', other: true, grid: true,
@@ -241,7 +261,7 @@ const FORM = [
     // ---------------- C. Walking barriers and priorities ----------------
     {
         id: 'barriers', label: 'Which barriers have you experienced on this walking trip?', type: 'multi', other: true, grid: true, exclusive: 'None',
-        hint: 'Select all that apply',
+        hint: 'Select all that apply', notes: 'Details in the respondent’s words (optional)',
         options: [
             ['Narrow / no footpath', 'fa-arrows-left-right-to-line'],
             ['Broken / uneven footpath surface', 'fa-road-barrier'],
@@ -276,7 +296,7 @@ const FORM = [
     },
     {
         id: 'improvements', label: 'Which improvements would you prioritise?', type: 'multi', other: true, grid: true, exclusive: 'None', max: 3,
-        hint: 'Select up to three',
+        hint: 'Select up to three', notes: 'Details in the respondent’s words (optional)',
         options: [
             ['Wider / continuous footpaths', 'fa-arrows-left-right'],
             ['Repair footpath surfaces', 'fa-trowel-bricks'],
@@ -1647,7 +1667,11 @@ function buildRecord(fix, interviewId, ts) {
         difficultyReasons: shown('difficultyReasons') ? multiValue('difficultyReasons') : '',
         accompanying: multiValue('accompanying'),
         entryMode: singleValue('entryMode'),
+        entryBusTerminal: shown('entryBusTerminal') ? placeParts('entryBusTerminal').text : '',
+        entryBusRoute: shown('entryBusRoute') ? placeParts('entryBusRoute').text : '',
         exitMode: singleValue('exitMode'),
+        exitBusTerminal: shown('exitBusTerminal') ? placeParts('exitBusTerminal').text : '',
+        exitBusRoute: shown('exitBusRoute') ? placeParts('exitBusRoute').text : '',
         entryFacility: multiValue('entryFacility'),
         ...placeCols('entryLocation', 'entryLocation'),
         exitFacility: multiValue('exitFacility'),
@@ -1660,10 +1684,12 @@ function buildRecord(fix, interviewId, ts) {
         underpassAvailable: shown('underpassAvailable') ? singleValue('underpassAvailable') : '',
         underpassWhyNot: shown('underpassWhyNot') ? multiValue('underpassWhyNot') : '',
         barriers: multiValue('barriers'),
+        barriersNotes: notesValue('barriers'),
         safetyConcern: shown('safetyConcern') ? multiValue('safetyConcern') : '',
         mainBarrier: shown('mainBarrier') ? fromValue('mainBarrier') : '',
         ...placeCols('mainBarrierLocation', 'mainBarrierLocation'),
         improvements: multiValue('improvements'),
+        improvementsNotes: notesValue('improvements'),
         firstPriority: fromValue('firstPriority')
     };
 }

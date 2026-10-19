@@ -34,6 +34,44 @@ window.KMTT_CONFIG = {
     ],
     surveyAreaCenter: { lat: 7.2906, lon: 80.6337 },
 
+    // Bus routes offered as you type in "Bus route" (entry / exit by bus).
+    // Any route can still be typed; edit this list as needed.
+    busRoutes: [
+        'Colombo – Kandy',
+        'Kandy – Kurunegala',
+        'Kandy – Matale',
+        'Kandy – Dambulla',
+        'Kandy – Anuradhapura',
+        'Kandy – Polonnaruwa',
+        'Kandy – Trincomalee',
+        'Kandy – Jaffna',
+        'Kandy – Batticaloa',
+        'Kandy – Ampara',
+        'Kandy – Mahiyanganaya',
+        'Kandy – Badulla',
+        'Kandy – Nuwara Eliya',
+        'Kandy – Hatton',
+        'Kandy – Gampola',
+        'Kandy – Nawalapitiya',
+        'Kandy – Kegalle',
+        'Kandy – Ratnapura',
+        'Kandy – Negombo',
+        'Kandy – Puttalam',
+        'Kandy – Galle',
+        'Kandy – Matara',
+        'Kandy – Kataragama',
+        'Kandy – Kadugannawa',
+        'Kandy – Peradeniya',
+        'Kandy – Galaha',
+        'Kandy – Katugastota',
+        'Kandy – Wattegama',
+        'Kandy – Digana',
+        'Kandy – Teldeniya',
+        'Kandy – Kundasale',
+        'Kandy – Ampitiya',
+        'Kandy – Hanguranketha'
+    ],
+
 
     // Route map: the survey area, shown as a dashed yellow box,
     // [west, south, east, north] (Kandy town).

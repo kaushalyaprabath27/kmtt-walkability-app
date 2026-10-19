@@ -54,7 +54,11 @@ const COLUMNS = [
   ["What Makes It Difficult", "difficultyReasons", "long"],
   ["Accompanying / Assisting", "accompanying", "text"],
   ["Mode Entering Area", "entryMode", "text"],
+  ["Entry Bus Terminal", "entryBusTerminal", "text"],
+  ["Entry Bus Route", "entryBusRoute", "text"],
   ["Mode Leaving Area", "exitMode", "text"],
+  ["Exit Bus Terminal", "exitBusTerminal", "text"],
+  ["Exit Bus Route", "exitBusRoute", "text"],
   ["Entry Facility", "entryFacility", "text"],
   ["Entry Location", "entryLocation", "text"],
   ["Entry Location Lat", "entryLocationLat", "num"],
@@ -74,12 +78,14 @@ const COLUMNS = [
   ["Underpass Available", "underpassAvailable", "text"],
   ["Why Underpass Not Used", "underpassWhyNot", "long"],
   ["Barriers Experienced", "barriers", "long"],
+  ["Barrier Details", "barriersNotes", "long"],
   ["Personal Safety Concerns", "safetyConcern", "text"],
   ["Main Barrier", "mainBarrier", "text"],
   ["Main Barrier Location", "mainBarrierLocation", "text"],
   ["Main Barrier Lat", "mainBarrierLocationLat", "num"],
   ["Main Barrier Lon", "mainBarrierLocationLon", "num"],
   ["Improvements Prioritised", "improvements", "long"],
+  ["Improvement Details", "improvementsNotes", "long"],
   ["First Priority", "firstPriority", "text"],
   ["Route Points (lat,lon,W=walked/P=planned)", "routePoints", "long"],
   ["Route Path (encoded polyline)", "routePath", "path"],
@@ -92,7 +98,7 @@ const EVENT_ID_COL = HEADERS.indexOf("EventID") + 1; // 1-based
 const SUMMARY_FIELDS = [
   "Gender", "Vulnerability (observed)", "Difficulties", "Age Category", "Relationship to Area", "Trip Purpose",
   "Walking Frequency", "Difficulty Walking / Steps / Crossing", "What Makes It Difficult", "Accompanying / Assisting",
-  "Mode Entering Area", "Mode Leaving Area", "Entry Facility", "Expected Exit Facility", "Route Choice Reasons",
+  "Mode Entering Area", "Entry Bus Terminal", "Entry Bus Route", "Mode Leaving Area", "Exit Bus Terminal", "Exit Bus Route", "Entry Facility", "Expected Exit Facility", "Route Choice Reasons",
   "Walking Time in Area", "Used Underpass", "Underpass Available", "Why Underpass Not Used", "Barriers Experienced",
   "Personal Safety Concerns", "Main Barrier", "Improvements Prioritised", "First Priority", "GPS Status"
 ];
@@ -127,7 +133,8 @@ function handleRequest(e) {
     for (const key in params) data[key] = params[key];
 
     const action = data.action;
-    if (action === "submit_kmtt_v1") return handleSubmitBatch(data);
+    // v2 = current app (bus terminal / route, notes); v1 is still accepted.
+    if (action === "submit_kmtt_v1" || action === "submit_kmtt_v2") return handleSubmitBatch(data);
     if (!action) return responseJson({ status: "success", message: "KMTT walkability survey backend is running." });
     return responseJson({ status: "error", message: "Invalid action" });
   } catch (error) {

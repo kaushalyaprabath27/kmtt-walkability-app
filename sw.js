@@ -1,6 +1,6 @@
 // Offline shell for the KMTT Walkability Survey PWA.
 // Bump CACHE_NAME whenever app files change so devices pick up the update.
-const CACHE_NAME = 'kmtt-walkability-v2';
+const CACHE_NAME = 'kmtt-walkability-v3';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',

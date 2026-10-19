@@ -9,22 +9,21 @@ Offline-first PWA for the **KMTT Walkability Improvement Feasibility Study** ped
    - **Location**: the phone's GPS position when the interview is saved (latitude, longitude, accuracy and a Google Maps link). The phone keeps tracking in the background, so saving is never held up. The chip at the top shows the accuracy (e.g. "GPS ±12 m"). If there is no fix within about 8 seconds, the interview is still saved and marked `stale` (last known position) or `unavailable`.
    - **Interview ID**: enumerator initials, date and a counter on this phone, e.g. `KW-20261019-003`. Undoing the last interview frees its number.
    - **Date and time.**
-3. **Questions** (numbered as in the questionnaire; follow-ups appear only when they apply):
+3. **Questions**, in three sections (follow-ups appear only when they apply):
 
    | Section | Questions |
    |---|---|
-   | A. Respondent and current trip | 1 gender, 1a vulnerability (observed), 1b difficulties · 2 age · 3 relationship to the area · 4 trip purpose · 5 origin · 6 destination · 7 how often · 8 difficulty walking → 8a what makes it difficult · 9 accompanying / assisting |
-   | B. Travel modes and walking route | 10 mode entering → **10a bus terminal, 10b bus route** (when Bus) · 11 mode leaving → **11a bus terminal, 11b bus route** (when Bus) · 12 entry facility → 12a entry location; 12b expected exit facility → 12c exit location · 13 route on the map, 13a landmarks in order · 14 why this route (**up to two**) · 15 walking time · 16 underpass used → 16a available? → 16b why not |
-   | C. Walking barriers and priorities | 17 barriers (+ optional notes in the respondent's words) → 17a personal safety concern (optional) · 18 main barrier (**chosen from the barriers ticked in 17**), 18a where · 19 improvements (**up to three**, + optional notes) · 20 first priority (**chosen from the improvements ticked in 19**) |
+   | About you | 1 gender (observed) · 2 age · 3 vulnerability (observed) · 4 difficulties · 5 main purpose of this trip (Work and Business listed separately) · 6 which best describes you (trip category from the Pedestrian O-D app) · 7 accompanying / assisting anyone (incl. Baby, Young child) |
+   | This trip | 8 where the trip started · 9 main destination · 10 how often they walk this path · 11 how they got to the **start of the walking trip** (None = walked) → 11a bus stand / terminal, 11b bus route (when Bus) · 12 how they will travel **after the end of the walking trip** → 12a, 12b (when Bus) · 13 why this path (**up to two**) · 14 walking time on this trip |
+   | The walking path | 15 difficulties on this path (vehicles parked on the path, motorcycles / three-wheelers on the path, goods / vendors, narrow, broken surface, steps / slope, open drains, lighting, garbage, shade, crowding, crossing at the path ends, personal safety; + optional notes) → 15a safety concern (optional) · 16 the difficulty that affects them most (**chosen from those ticked in 15**), 16a where · 17 improvements (**up to three**, + optional notes) · 18 first priority (**chosen from those ticked in 17**) |
 
-   **Bus routes** (10b, 11b) suggest the `busRoutes` list in [`config.js`](config.js), routes used before, and **any Sri Lankan town as a route** (typing *bad* offers *Badulla – Kandy* on entry, *Kandy – Badulla* on exit); any route can still be typed. Bus terminals (10a, 11a) suggest the study-area list, terminals used before and map places.
+   **Bus routes** (11b, 12b) suggest the `busRoutes` list in [`config.js`](config.js), routes used before, and **any Sri Lankan town as a route** (typing *bad* offers *Badulla – Kandy* for 11b, *Kandy – Badulla* for 12b); any route can still be typed. Bus stands (11a, 12a) suggest the study-area list, stands used before and map places.
 
-4. **Q13 route map:** tap the start, each turn and the end; each part follows the footpaths/streets. The **Walked so far / Planned** button switches what the next taps mark: walked = solid blue, planned (still to walk) = dashed orange. A blue dot shows the interview location. Full screen, satellite / street map and a place search work as in the Pedestrian O-D app.
-5. **Save interview.** A half-filled form survives closing the app. **Undo** deletes the last saved interview (until it has been sent). **End** finishes the survey.
+4. **Save interview.** A half-filled form survives closing the app. **Undo** deletes the last saved interview (until it has been sent). **End** finishes the survey.
 
 ## Data (sheet tab `kmtt-walkability`)
 
-Interview ID, Enumerator, Date, Time, **GPS Lat / Lon / Accuracy (m) / Fix Time / Status**, Interview Location Map Link, then one column per question (places with Lat / Lon where a map suggestion was picked), Route Length / Walked / Planned (m), Route Map Link, Route Points (`lat,lon,W|P`), Route Path (encoded polyline), EventID.
+Interview ID, Enumerator, Date, Time, **GPS Lat / Lon / Accuracy (m) / Fix Time / Status**, Interview Location Map Link, then one column per question in form order (places with Lat / Lon where a map suggestion was picked; bus stand and route next to each mode; notes next to their question), EventID.
 
 Multiple answers are separated by `; `; "Other" answers are saved as `Other: <text>`. The sheet menu **KMTT Walkability → Build / refresh summary** counts every answer, overall and per survey date (including how many interviews were saved without GPS).
 

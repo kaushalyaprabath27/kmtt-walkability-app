@@ -3,8 +3,8 @@
    ---------------------------------------------------------------------
    One form per interview. Only the enumerator is set at the start; every
    saved interview records its own GPS position, date, time and an
-   automatic Interview ID. The walking route is drawn on a map, split into
-   the part already walked and the part still planned.
+   automatic Interview ID. Questions run in three sections: about the
+   respondent, this trip, and the walking path.
 
    Offline-first, like the other survey apps: each saved interview goes to
    localStorage first and is sent to the Apps Script backend in batches
@@ -21,8 +21,10 @@ const CONFIG = Object.assign({
 
 const PLACEHOLDER_URL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE';
 const SURVEY_TYPE = 'kmtt-walkability';
-// v2: bus terminal + route on entry / exit by bus; notes under barriers and improvements.
-const SYNC_ACTION = 'submit_kmtt_v2';
+// v3: revised questionnaire (sections, trip category, modes to / from the
+// walking trip, walking-path difficulties; no route map). v2: bus terminal +
+// route, notes.
+const SYNC_ACTION = 'submit_kmtt_v3';
 const BATCH_SIZE = 50;
 const SYNC_INTERVAL_MS = 15000;
 
@@ -63,14 +65,14 @@ const THEME_KEY = 'kmtt_theme';
 //   showIf: answers => boolean  shows the question only when true (numbered
 //   as a sub-question, e.g. 5a, 5b, and not counted while hidden)
 //   sub: true  numbered as a sub-question (e.g. 1a) but always shown
-//   main: true a conditional question that keeps its own number (e.g. 18)
+//   main: true a conditional question that keeps its own number (e.g. 16)
+//   section: 'Title'  starts a new section of the form with this heading
 // An option can carry an icon: a Font Awesome name or inline SVG.
 // ---------------------------------------------------------------------
 const TUKTUK_SVG = '<svg class="svg-icon" viewBox="1.8 1.4 28.4 23" fill="currentColor" fill-rule="evenodd" aria-hidden="true"><path d="M2.5 13V6.2Q2.5 2 7 2H24.2Q26.4 2 26.7 3.8L27.9 12.4H26.1L25.1 4.3H7.6Q5.3 4.3 5.3 6.6V13Z"/><path d="M3.5 12.6H27.4Q29.7 12.6 29.7 15Q29.7 16.4 28.6 17.6L27.8 18.6H10.77A3.6 3.6 0 0 0 5.23 18.6H4.6Q2.4 18.6 2.4 16.2V13.7Q2.4 12.6 3.5 12.6ZM27.5 14.6a0.85 0.85 0 1 0 1.7 0a0.85 0.85 0 1 0 -1.7 0Z"/><path d="M22.6 12.6L24.6 8.4L25.5 8.8L23.8 12.6Z"/><path d="M5 20.9a3 3 0 1 0 6 0a3 3 0 1 0 -6 0ZM6.9 20.9a1.1 1.1 0 1 0 2.2 0a1.1 1.1 0 1 0 -2.2 0ZM24 21.4a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0ZM25.6 21.4a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0Z"/><path d="M26.05 18.4H26.95V20.5H26.05Z"/></svg>';
 
-// Travel modes, shared by the entry and exit questions.
+// Travel modes for getting to / from the walking trip ('None' = walking only).
 const MODES = [
-    ['Walked all the way', 'fa-person-walking'],
     ['Bus', 'fa-bus'],
     ['Train', 'fa-train'],
     ['Three-wheeler', TUKTUK_SVG],
@@ -80,31 +82,21 @@ const MODES = [
     ['Taxi / ride-hailing', 'fa-taxi'],
     ['School / office van', 'fa-van-shuttle']
 ];
-
-// Boarding / alighting / parking / drop-off facility types (Q12).
-const FACILITIES = [
-    ['Bus stop / halt', 'fa-signs-post'],
-    ['Bus stand / terminal', 'fa-bus-simple'],
-    ['Railway station', 'fa-train-subway'],
-    ['Three-wheeler stand', TUKTUK_SVG],
-    ['Car park', 'fa-square-parking'],
-    ['Kerbside pick-up / drop-off', 'fa-people-arrows']
-];
-const WALK_ONLY = 'Not applicable (walk only)';
-const SAFETY_BARRIER = 'Personal safety / security concern';
+const SAFETY_DIFFICULTY = 'Personal safety / security concern';
 
 const has = (a, id, v) => Array.isArray(a[id]) && a[id].includes(v);
 const answeredNot = (a, id, v) => Array.isArray(a[id]) && a[id].length > 0 && !a[id].includes(v);
 
 const FORM = [
-    // ---------------- A. Respondent and current trip ----------------
-    { id: 'gender', label: 'Gender', type: 'single', options: ['Male', 'Female'] },
+    // ---------------- A. About you ----------------
+    { id: 'gender', section: 'About you', label: 'Gender', type: 'single', hint: 'Observe', options: ['Male', 'Female'] },
+    { id: 'age', label: 'What is your age?', type: 'single', options: ['Under 18', '18–40', '41–60', 'Over 60'] },
     {
-        id: 'vulnerability', label: 'Vulnerability (observed)', type: 'multi', sub: true, exclusive: 'None',
+        id: 'vulnerability', label: 'Vulnerability (observed)', type: 'multi', exclusive: 'None',
         hint: 'Tick if it applies', options: [['Blind', 'fa-eye-slash'], ['Challenged with mobility', 'fa-wheelchair'], ['None', 'fa-circle-check']]
     },
     {
-        id: 'difficulties', label: 'Do you have any of the following difficulties?', type: 'multi', sub: true, grid: true,
+        id: 'difficulties', label: 'Do you have any of the following difficulties?', type: 'multi', grid: true,
         exclusive: ['None', 'Prefer not to answer'], hint: 'Select all that apply',
         options: [
             'Difficulty walking or using steps',
@@ -115,15 +107,11 @@ const FORM = [
             'Prefer not to answer'
         ]
     },
-    { id: 'age', label: 'Age category', type: 'single', options: ['Under 18', '18–40', '41–60', 'Over 60', 'Prefer not to answer'] },
-    {
-        id: 'relationship', label: 'What is your relationship to this area?', type: 'multi', other: true, hint: 'Select all that apply',
-        options: [['Resident', 'fa-house'], ['Works here', 'fa-briefcase'], ['Studies here', 'fa-graduation-cap'], ['Visitor', 'fa-camera']]
-    },
     {
         id: 'purpose', label: 'What is the main purpose of this trip?', type: 'single', other: true, grid: true,
         options: [
-            ['Work / business (including vending)', 'fa-briefcase'],
+            ['Work', 'fa-briefcase'],
+            ['Business (including vending)', 'fa-store'],
             ['Education', 'fa-graduation-cap'],
             ['Healthcare', 'fa-hospital-user'],
             ['Shopping', 'fa-bag-shopping'],
@@ -133,94 +121,64 @@ const FORM = [
             ['Travel interchange', 'fa-shuffle']
         ]
     },
-    { id: 'origin', label: 'Where did this trip start?', type: 'place', presets: true, cities: true, hint: 'Place / locality / landmark', placeholder: 'Start typing a location' },
-    { id: 'destination', label: 'What is your principal destination on this trip?', type: 'place', presets: true, cities: true, hint: 'Place / locality / landmark', placeholder: 'Start typing a location' },
     {
-        id: 'frequency', label: 'How often do you walk along this route?', type: 'single',
-        options: ['Daily', 'Several days a week', 'About once a week', 'Less frequently', 'First visit']
-    },
-    {
-        id: 'walkDifficulty', label: 'Do you have difficulty walking, using steps or crossing roads?', type: 'single',
-        options: ['No', 'Yes', 'Prefer not to answer']
-    },
-    {
-        id: 'difficultyReasons', label: 'What makes it difficult for you?', type: 'multi', grid: true, exclusive: 'Prefer not to answer',
-        showIf: a => a.walkDifficulty === 'Yes', hint: 'Select all that apply',
+        id: 'category', label: 'Which best describes you on this trip?', type: 'single', other: true, grid: true,
         options: [
-            'Pain or difficulty moving legs or joints',
-            'Tiredness or difficulty walking long distances',
-            'Difficulty maintaining balance',
-            'Difficulty seeing steps, obstacles or approaching vehicles',
-            'Difficulty hearing approaching vehicles',
-            'Need a walking stick, crutches, walker or wheelchair',
-            'Difficulty walking quickly enough to cross the road',
-            'Carrying heavy goods, bags or a child',
-            'Other difficulty',
-            'Prefer not to answer'
+            ['Resident', 'fa-house'],
+            ['Worker / employee', 'fa-briefcase'],
+            ['School child', 'fa-child'],
+            ['University student', 'fa-graduation-cap'],
+            ['Other student', 'fa-book'],
+            ['Patient', 'fa-hospital-user'],
+            ['Shopper / customer', 'fa-bag-shopping'],
+            ['Tourist / visitor', 'fa-camera'],
+            ['Pilgrim', 'fa-place-of-worship'],
+            ['Passing through', 'fa-person-walking-arrow-right'],
+            ['Vendor / trader', 'fa-store']
         ]
     },
     {
-        id: 'accompanying', label: 'On this trip, are you accompanying or assisting anyone?', type: 'multi', other: true, exclusive: 'No',
+        id: 'accompanying', label: 'Are you accompanying or assisting anyone on this trip?', type: 'multi', other: true, exclusive: 'No',
         hint: 'Select all that apply',
-        options: [['No', 'fa-user'], ['Young child', 'fa-child'], ['Older person', 'fa-person-cane'], ['Person requiring mobility assistance', 'fa-wheelchair']]
+        options: [['No', 'fa-user'], ['Baby', 'fa-baby'], ['Young child', 'fa-child'], ['Older person', 'fa-person-cane'], ['Person requiring mobility assistance', 'fa-wheelchair']]
     },
 
-    // ---------------- B. Travel modes and walking route ----------------
+    // ---------------- B. This trip ----------------
+    { id: 'origin', section: 'This trip', label: 'Where did this trip start?', type: 'place', presets: true, cities: true, hint: 'Place / locality / landmark', placeholder: 'Start typing a location' },
+    { id: 'destination', label: 'What is your main destination on this trip?', type: 'place', presets: true, cities: true, hint: 'Place / locality / landmark', placeholder: 'Start typing a location' },
     {
-        id: 'entryMode', label: 'What mode did you use to enter the study area?', type: 'single', other: true, grid: true,
-        hint: 'If several, the last mode before entering', options: MODES
-    },
-    // Bus terminal and route: asked only when they enter / leave by bus.
-    {
-        id: 'entryBusTerminal', label: 'Bus terminal where they got off', type: 'place', presets: true, nearby: true, recent: true, recentGroup: 'busTerminal',
-        icon: 'fa-bus-simple', showIf: a => a.entryMode === 'Bus', hint: 'Arrived by bus', placeholder: 'Start typing a bus terminal / stand'
+        id: 'frequency', label: 'How often do you walk along this path?', type: 'single',
+        options: ['Daily', 'Several days a week', 'About once a week', 'Less frequently', 'First visit']
     },
     {
-        id: 'entryBusRoute', label: 'Bus route they came on', type: 'place', presets: 'busRoutes', presetSub: 'Bus route', mapSearch: false, cityRoutes: 'from',
+        id: 'startMode', label: 'How did you get to the start of this walking trip?', type: 'single', other: true, grid: true,
+        hint: 'The mode used just before walking', options: [['None', 'fa-person-walking']].concat(MODES)
+    },
+    // Bus stand and route: asked only when they came / will go by bus.
+    {
+        id: 'startBusTerminal', label: 'Which bus stand / terminal did you get off at?', type: 'place', presets: true, nearby: true, recent: true, recentGroup: 'busTerminal',
+        icon: 'fa-bus-simple', showIf: a => a.startMode === 'Bus', placeholder: 'Start typing a bus stand / terminal'
+    },
+    {
+        id: 'startBusRoute', label: 'Which bus route did you come on?', type: 'place', presets: 'busRoutes', presetSub: 'Bus route', mapSearch: false, cityRoutes: 'from',
         recent: true, recentGroup: 'busRoute', icon: 'fa-bus',
-        showIf: a => a.entryMode === 'Bus', hint: 'e.g. Colombo – Kandy', placeholder: 'Type a town, e.g. Colombo'
+        showIf: a => a.startMode === 'Bus', hint: 'e.g. Colombo – Kandy', placeholder: 'Type a town, e.g. Colombo'
     },
     {
-        id: 'exitMode', label: 'How do you expect to leave the study area on this trip?', type: 'single', other: true, grid: true,
-        hint: 'If several, the first mode after leaving',
-        options: [['Walk all the way', 'fa-person-walking']].concat(MODES.slice(1), [['Not yet decided', 'fa-circle-question']])
+        id: 'endMode', label: 'How will you travel after the end of this walking trip?', type: 'single', other: true, grid: true,
+        hint: 'The mode used just after walking', options: [['None', 'fa-person-walking']].concat(MODES, [['Not yet decided', 'fa-circle-question']])
     },
     {
-        id: 'exitBusTerminal', label: 'Bus terminal where they will board', type: 'place', presets: true, nearby: true, recent: true, recentGroup: 'busTerminal',
-        icon: 'fa-bus-simple', showIf: a => a.exitMode === 'Bus', hint: 'Leaving by bus', placeholder: 'Start typing a bus terminal / stand'
+        id: 'endBusTerminal', label: 'Which bus stand / terminal will you board at?', type: 'place', presets: true, nearby: true, recent: true, recentGroup: 'busTerminal',
+        icon: 'fa-bus-simple', showIf: a => a.endMode === 'Bus', placeholder: 'Start typing a bus stand / terminal'
     },
     {
-        id: 'exitBusRoute', label: 'Bus route they will take', type: 'place', presets: 'busRoutes', presetSub: 'Bus route', mapSearch: false, cityRoutes: 'to',
+        id: 'endBusRoute', label: 'Which bus route will you take?', type: 'place', presets: 'busRoutes', presetSub: 'Bus route', mapSearch: false, cityRoutes: 'to',
         recent: true, recentGroup: 'busRoute', icon: 'fa-bus',
-        showIf: a => a.exitMode === 'Bus', hint: 'e.g. Kandy – Kurunegala', placeholder: 'Type a town, e.g. Kurunegala'
+        showIf: a => a.endMode === 'Bus', hint: 'e.g. Kandy – Kurunegala', placeholder: 'Type a town, e.g. Kurunegala'
     },
     {
-        id: 'entryFacility', label: 'Where did you board, alight, park or get dropped off? (entry)', type: 'multi', other: true, grid: true,
-        exclusive: WALK_ONLY, hint: 'Tick all relevant facility types', options: FACILITIES.concat([[WALK_ONLY, 'fa-person-walking']])
-    },
-    {
-        id: 'entryLocation', label: 'Entry location / landmark', type: 'place', presets: true, nearby: true, recent: true, recentGroup: 'stop',
-        showIf: a => answeredNot(a, 'entryFacility', WALK_ONLY), placeholder: 'Stop, stand, car park or landmark'
-    },
-    {
-        id: 'exitFacility', label: 'Expected exit: board, park or get picked up', type: 'multi', other: true, grid: true, sub: true,
-        exclusive: [WALK_ONLY, 'Not yet decided'], hint: 'Tick all relevant facility types',
-        options: FACILITIES.concat([[WALK_ONLY, 'fa-person-walking'], ['Not yet decided', 'fa-circle-question']])
-    },
-    {
-        id: 'exitLocation', label: 'Expected exit location / landmark', type: 'place', presets: true, nearby: true, recent: true, recentGroup: 'stop',
-        showIf: a => answeredNot(a, 'exitFacility', WALK_ONLY) && !has(a, 'exitFacility', 'Not yet decided'), placeholder: 'Stop, stand, car park or landmark'
-    },
-    {
-        id: 'route', label: 'Walking route used or planned: draw on the map', type: 'route',
-        hint: 'Tap the start, each turn and the end. Switch to "Planned" for the part still to walk.'
-    },
-    {
-        id: 'landmarks', label: 'Landmarks in order', type: 'place', multi: true, presets: true, nearby: true, recent: true, sub: true,
-        hint: 'Add each landmark in order', placeholder: 'Type a landmark, then pick it'
-    },
-    {
-        id: 'routeReason', label: 'Why did you choose this walking route?', type: 'multi', other: true, grid: true, max: 2,
+        id: 'routeReason', label: 'Why did you choose this walking path?', type: 'multi', other: true, grid: true, max: 2,
         hint: 'Select up to two',
         options: [
             ['Shortest', 'fa-ruler'],
@@ -228,95 +186,74 @@ const FORM = [
             ['Safer crossing', 'fa-shield-halved'],
             ['Access to shops / services', 'fa-store'],
             ['Shade / shelter', 'fa-umbrella'],
-            ['Avoid steps / underpass', 'fa-stairs'],
+            ['Avoid steps', 'fa-stairs'],
             ['Only practical route', 'fa-route']
         ]
     },
     {
-        id: 'walkTime', label: 'Approximate total walking time within the study area', type: 'single',
-        hint: 'Include the remaining planned walking',
+        id: 'walkTime', label: 'About how long is your walk on this trip?', type: 'single',
+        hint: 'Include the part still to walk',
         options: ['Less than 5 minutes', '5–10 minutes', '10–15 minutes', 'Over 15 minutes', 'Do not know']
     },
-    { id: 'usedUnderpass', label: 'Have you used an underpass on this trip?', type: 'single', yesno: true, options: ['Yes', 'No'] },
-    {
-        id: 'underpassAvailable', label: 'Was an underpass an available option for this trip?', type: 'single',
-        showIf: a => a.usedUnderpass === 'No', options: ['Yes', 'No', 'Do not know']
-    },
-    {
-        id: 'underpassWhyNot', label: 'Why did you not use it?', type: 'multi', other: true, grid: true,
-        showIf: a => a.usedUnderpass === 'No' && a.underpassAvailable === 'Yes', hint: 'Select all that apply',
-        options: [
-            ['Not on my chosen route', 'fa-route'],
-            ['Adds distance / time', 'fa-clock'],
-            ['Difficult steps', 'fa-stairs'],
-            ['Poor lighting', 'fa-lightbulb'],
-            ['Personal safety concern', 'fa-shield-halved'],
-            ['Unclean', 'fa-trash'],
-            ['Flooded', 'fa-water'],
-            ['Did not know about it', 'fa-circle-question'],
-            ['Plan to use it later on this trip', 'fa-forward']
-        ]
-    },
 
-    // ---------------- C. Walking barriers and priorities ----------------
+    // ---------------- C. The walking path ----------------
     {
-        id: 'barriers', label: 'Which barriers have you experienced on this walking trip?', type: 'multi', other: true, grid: true, exclusive: 'None',
-        hint: 'Select all that apply', notes: 'Details in the respondent’s words (optional)',
+        id: 'pathDifficulties', section: 'The walking path', label: 'What difficulties did you find when walking this path?', type: 'multi', other: true, grid: true,
+        exclusive: 'None', hint: 'Select all that apply', notes: 'Details in the respondent’s words (optional)',
         options: [
-            ['Narrow / no footpath', 'fa-arrows-left-right-to-line'],
-            ['Broken / uneven footpath surface', 'fa-road-barrier'],
-            ['Footpath blocked by parked vehicles', 'fa-car-side'],
-            ['Footpath blocked by vendors / goods', 'fa-store'],
-            ['Heavy traffic / unsafe to cross', 'fa-car-burst'],
-            ['No pedestrian crossing nearby', 'fa-person-walking-arrow-loop-left'],
-            ['Long wait to cross', 'fa-hourglass-half'],
+            ['Vehicles parked on the walking path', 'fa-car-side'],
+            ['Motorcycles / three-wheelers riding on the path', 'fa-motorcycle'],
+            ['Goods or vendors blocking the path', 'fa-store'],
+            ['Path too narrow', 'fa-arrows-left-right-to-line'],
+            ['Broken / uneven surface', 'fa-road-barrier'],
+            ['Steps or steep slope with no ramp', 'fa-stairs'],
+            ['Open drains / slippery or flooded surface', 'fa-water'],
             ['Poor lighting at night', 'fa-lightbulb'],
-            ['Steps with no ramp or accessible alternative', 'fa-wheelchair'],
-            ['Difficult kerbs', 'fa-road'],
-            ['Missing / blocked ramps', 'fa-ban'],
-            ['Slippery surface / standing water', 'fa-water'],
+            ['Garbage / unclean path', 'fa-trash'],
             ['No shade / shelter', 'fa-sun'],
             ['Crowding', 'fa-people-group'],
-            [SAFETY_BARRIER, 'fa-shield-halved'],
+            ['Unsafe to cross the road at the path ends', 'fa-car-burst'],
+            [SAFETY_DIFFICULTY, 'fa-shield-halved'],
             ['None', 'fa-circle-check']
         ]
     },
     {
-        id: 'safetyConcern', label: 'What personal safety concern do you wish to identify?', type: 'multi', other: true, optional: true,
-        exclusive: 'Prefer not to specify', showIf: a => has(a, 'barriers', SAFETY_BARRIER), hint: 'Optional · select all that apply',
+        id: 'safetyConcern', label: 'What personal safety concern would you like to mention?', type: 'multi', other: true, optional: true,
+        exclusive: 'Prefer not to specify', showIf: a => has(a, 'pathDifficulties', SAFETY_DIFFICULTY), hint: 'Optional · select all that apply',
         options: [['Harassment', 'fa-hand'], ['Fear of theft', 'fa-mask'], ['Isolated places', 'fa-street-view'], ['Poorly lit places', 'fa-moon'], ['Prefer not to specify', 'fa-eye-slash']]
     },
     {
-        id: 'mainBarrier', label: 'Which barrier causes you the most difficulty?', type: 'single', optionsFrom: 'barriers', exclude: ['None'],
-        showIf: a => answeredNot(a, 'barriers', 'None'), main: true
+        id: 'mainDifficulty', label: 'Which of these difficulties affects you the most?', type: 'single', optionsFrom: 'pathDifficulties', exclude: ['None'],
+        showIf: a => answeredNot(a, 'pathDifficulties', 'None'), main: true
     },
     {
-        id: 'mainBarrierLocation', label: 'Where is it?', type: 'place', presets: true, nearby: true, recent: true, recentGroup: 'barrier',
-        showIf: a => answeredNot(a, 'barriers', 'None'), hint: 'Location / landmark', placeholder: 'Road, junction or landmark'
+        id: 'mainDifficultyLocation', label: 'Where on the path is it?', type: 'place', presets: true, nearby: true, recent: true, recentGroup: 'difficulty',
+        showIf: a => answeredNot(a, 'pathDifficulties', 'None'), hint: 'Location / landmark', placeholder: 'Lane, junction or landmark'
     },
     {
-        id: 'improvements', label: 'Which improvements would you prioritise?', type: 'multi', other: true, grid: true, exclusive: 'None', max: 3,
+        id: 'improvements', label: 'Which improvements would you like on this walking path?', type: 'multi', other: true, grid: true, exclusive: 'None', max: 3,
         hint: 'Select up to three', notes: 'Details in the respondent’s words (optional)',
         options: [
-            ['Wider / continuous footpaths', 'fa-arrows-left-right'],
-            ['Repair footpath surfaces', 'fa-trowel-bricks'],
-            ['Prevent parking on footpaths', 'fa-ban'],
-            ['Organise space for vending and provide a clear walking path', 'fa-store'],
+            ['Keep parked vehicles off the walking path', 'fa-ban'],
+            ['Wider / continuous walking path', 'fa-arrows-left-right'],
+            ['Repair the path surface', 'fa-trowel-bricks'],
+            ['Organise space for vending and keep a clear walking path', 'fa-store'],
+            ['Cover drains / improve drainage', 'fa-water'],
+            ['Better street lighting', 'fa-lightbulb'],
+            ['Shade / covered walkway', 'fa-umbrella'],
+            ['Ramps / accessible design', 'fa-wheelchair'],
+            ['Keep the path clean', 'fa-broom'],
             ['More pedestrian crossings', 'fa-person-walking'],
             ['Signalised crossings', 'fa-traffic-light'],
-            ['Elevated crossings', 'fa-bridge'],
-            ['Better street lighting', 'fa-lightbulb'],
-            ['Shade / covered walkways', 'fa-umbrella'],
-            ['Ramps / accessible design', 'fa-wheelchair'],
             ['Slower traffic / traffic calming', 'fa-gauge-simple'],
             ['Seating / rest areas', 'fa-chair'],
             ['Signs / wayfinding', 'fa-signs-post'],
-            ['Pedestrian-only streets', 'fa-person-walking-arrow-right'],
+            ['Pedestrian-only path', 'fa-person-walking-arrow-right'],
             ['None', 'fa-circle-check']
         ]
     },
     {
-        id: 'firstPriority', label: 'Of the improvements selected, which is your first priority?', type: 'single',
+        id: 'firstPriority', label: 'Which one improvement would you do first?', type: 'single',
         optionsFrom: 'improvements', exclude: ['None'], emptyOption: 'Not applicable (none selected)'
     }
 ];
@@ -600,6 +537,7 @@ function buildForm() {
     formEl.innerHTML = '';
     let num = 0, sub = 0;
     FORM.forEach(f => {
+        if (f.section) formEl.appendChild(el('h2', 'form-section', escapeHtml(f.section)));
         const q = el('section', 'q');
         q.dataset.q = f.id;
         // Sub-questions follow their main question: 5a, 5b, ...
@@ -1639,6 +1577,10 @@ function placeCols(id, prefix) {
 function buildRecord(fix, interviewId, ts) {
     const now = ts || Date.now();
     const g = fix || {};
+    const busCols = (prefix, terminalId, routeId) => ({
+        [prefix + 'BusTerminal']: shown(terminalId) ? placeParts(terminalId).text : '',
+        [prefix + 'BusRoute']: shown(routeId) ? placeParts(routeId).text : ''
+    });
     return {
         action: 'submit',
         surveyType: SURVEY_TYPE,
@@ -1654,40 +1596,30 @@ function buildRecord(fix, interviewId, ts) {
         gpsFixTime: g.ts ? formatTime(g.ts) : '',
         gpsStatus: fix ? fix.status : 'unavailable',
         locationMapLink: fix ? `https://www.google.com/maps?q=${g.lat},${g.lon}` : '',
+        // A. About you
         gender: singleValue('gender'),
+        age: singleValue('age'),
         vulnerability: multiValue('vulnerability'),
         difficulties: multiValue('difficulties'),
-        age: singleValue('age'),
-        relationship: multiValue('relationship'),
         purpose: singleValue('purpose'),
+        category: singleValue('category'),
+        accompanying: multiValue('accompanying'),
+        // B. This trip
         ...placeCols('origin', 'origin'),
         ...placeCols('destination', 'destination'),
         frequency: singleValue('frequency'),
-        walkDifficulty: singleValue('walkDifficulty'),
-        difficultyReasons: shown('difficultyReasons') ? multiValue('difficultyReasons') : '',
-        accompanying: multiValue('accompanying'),
-        entryMode: singleValue('entryMode'),
-        entryBusTerminal: shown('entryBusTerminal') ? placeParts('entryBusTerminal').text : '',
-        entryBusRoute: shown('entryBusRoute') ? placeParts('entryBusRoute').text : '',
-        exitMode: singleValue('exitMode'),
-        exitBusTerminal: shown('exitBusTerminal') ? placeParts('exitBusTerminal').text : '',
-        exitBusRoute: shown('exitBusRoute') ? placeParts('exitBusRoute').text : '',
-        entryFacility: multiValue('entryFacility'),
-        ...placeCols('entryLocation', 'entryLocation'),
-        exitFacility: multiValue('exitFacility'),
-        ...placeCols('exitLocation', 'exitLocation'),
-        ...routeRecord(answers.route),
-        landmarks: (Array.isArray(answers.landmarks) ? answers.landmarks : []).map(x => x.text).join('; '),
+        startMode: singleValue('startMode'),
+        ...busCols('start', 'startBusTerminal', 'startBusRoute'),
+        endMode: singleValue('endMode'),
+        ...busCols('end', 'endBusTerminal', 'endBusRoute'),
         routeReason: multiValue('routeReason'),
         walkTime: singleValue('walkTime'),
-        usedUnderpass: singleValue('usedUnderpass'),
-        underpassAvailable: shown('underpassAvailable') ? singleValue('underpassAvailable') : '',
-        underpassWhyNot: shown('underpassWhyNot') ? multiValue('underpassWhyNot') : '',
-        barriers: multiValue('barriers'),
-        barriersNotes: notesValue('barriers'),
+        // C. The walking path
+        pathDifficulties: multiValue('pathDifficulties'),
+        pathDifficultiesNotes: notesValue('pathDifficulties'),
         safetyConcern: shown('safetyConcern') ? multiValue('safetyConcern') : '',
-        mainBarrier: shown('mainBarrier') ? fromValue('mainBarrier') : '',
-        ...placeCols('mainBarrierLocation', 'mainBarrierLocation'),
+        mainDifficulty: shown('mainDifficulty') ? fromValue('mainDifficulty') : '',
+        ...placeCols('mainDifficultyLocation', 'mainDifficultyLocation'),
         improvements: multiValue('improvements'),
         improvementsNotes: notesValue('improvements'),
         firstPriority: fromValue('firstPriority')

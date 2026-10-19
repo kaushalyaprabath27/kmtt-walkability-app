@@ -1,6 +1,6 @@
 // Offline shell for the KMTT Walkability Survey PWA.
 // Bump CACHE_NAME whenever app files change so devices pick up the update.
-const CACHE_NAME = 'kmtt-walkability-v3';
+const CACHE_NAME = 'kmtt-walkability-v4';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -12,9 +12,7 @@ const ASSETS_TO_CACHE = [
     './icons/icon-512.png',
     './icons/favicon-32.png',
     'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap',
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
-    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
-    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
 ];
 
 self.addEventListener('install', event => {

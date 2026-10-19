@@ -38,57 +38,37 @@ const COLUMNS = [
   ["GPS Status", "gpsStatus", "text"],
   ["Interview Location Map Link", "locationMapLink", "long"],
   ["Gender", "gender", "text"],
+  ["Age Category", "age", "text"],
   ["Vulnerability (observed)", "vulnerability", "text"],
   ["Difficulties", "difficulties", "long"],
-  ["Age Category", "age", "text"],
-  ["Relationship to Area", "relationship", "text"],
   ["Trip Purpose", "purpose", "text"],
+  ["Respondent / Trip Category", "category", "text"],
+  ["Accompanying / Assisting", "accompanying", "text"],
   ["Origin", "origin", "text"],
   ["Origin Lat", "originLat", "num"],
   ["Origin Lon", "originLon", "num"],
-  ["Principal Destination", "destination", "text"],
+  ["Main Destination", "destination", "text"],
   ["Destination Lat", "destinationLat", "num"],
   ["Destination Lon", "destinationLon", "num"],
   ["Walking Frequency", "frequency", "text"],
-  ["Difficulty Walking / Steps / Crossing", "walkDifficulty", "text"],
-  ["What Makes It Difficult", "difficultyReasons", "long"],
-  ["Accompanying / Assisting", "accompanying", "text"],
-  ["Mode Entering Area", "entryMode", "text"],
-  ["Entry Bus Terminal", "entryBusTerminal", "text"],
-  ["Entry Bus Route", "entryBusRoute", "text"],
-  ["Mode Leaving Area", "exitMode", "text"],
-  ["Exit Bus Terminal", "exitBusTerminal", "text"],
-  ["Exit Bus Route", "exitBusRoute", "text"],
-  ["Entry Facility", "entryFacility", "text"],
-  ["Entry Location", "entryLocation", "text"],
-  ["Entry Location Lat", "entryLocationLat", "num"],
-  ["Entry Location Lon", "entryLocationLon", "num"],
-  ["Expected Exit Facility", "exitFacility", "text"],
-  ["Expected Exit Location", "exitLocation", "text"],
-  ["Expected Exit Location Lat", "exitLocationLat", "num"],
-  ["Expected Exit Location Lon", "exitLocationLon", "num"],
-  ["Route Length (m)", "routeLengthM", "num"],
-  ["Route Walked (m)", "routeWalkedM", "num"],
-  ["Route Planned (m)", "routePlannedM", "num"],
-  ["Route Map Link", "routeMapLink", "long"],
-  ["Landmarks in Order", "landmarks", "long"],
-  ["Route Choice Reasons", "routeReason", "text"],
-  ["Walking Time in Area", "walkTime", "text"],
-  ["Used Underpass", "usedUnderpass", "text"],
-  ["Underpass Available", "underpassAvailable", "text"],
-  ["Why Underpass Not Used", "underpassWhyNot", "long"],
-  ["Barriers Experienced", "barriers", "long"],
-  ["Barrier Details", "barriersNotes", "long"],
+  ["Mode to Walk Start", "startMode", "text"],
+  ["Start Bus Stand / Terminal", "startBusTerminal", "text"],
+  ["Start Bus Route", "startBusRoute", "text"],
+  ["Mode After Walk End", "endMode", "text"],
+  ["End Bus Stand / Terminal", "endBusTerminal", "text"],
+  ["End Bus Route", "endBusRoute", "text"],
+  ["Path Choice Reasons", "routeReason", "text"],
+  ["Walking Time (this trip)", "walkTime", "text"],
+  ["Path Difficulties", "pathDifficulties", "long"],
+  ["Difficulty Details", "pathDifficultiesNotes", "long"],
   ["Personal Safety Concerns", "safetyConcern", "text"],
-  ["Main Barrier", "mainBarrier", "text"],
-  ["Main Barrier Location", "mainBarrierLocation", "text"],
-  ["Main Barrier Lat", "mainBarrierLocationLat", "num"],
-  ["Main Barrier Lon", "mainBarrierLocationLon", "num"],
+  ["Main Difficulty", "mainDifficulty", "text"],
+  ["Main Difficulty Location", "mainDifficultyLocation", "text"],
+  ["Main Difficulty Lat", "mainDifficultyLocationLat", "num"],
+  ["Main Difficulty Lon", "mainDifficultyLocationLon", "num"],
   ["Improvements Prioritised", "improvements", "long"],
   ["Improvement Details", "improvementsNotes", "long"],
   ["First Priority", "firstPriority", "text"],
-  ["Route Points (lat,lon,W=walked/P=planned)", "routePoints", "long"],
-  ["Route Path (encoded polyline)", "routePath", "path"],
   ["EventID", "eventId", "text"]
 ];
 const HEADERS = COLUMNS.map(function (c) { return c[0]; });
@@ -96,16 +76,14 @@ const EVENT_ID_COL = HEADERS.indexOf("EventID") + 1; // 1-based
 
 // Categorical columns counted on the Summary tab (per survey date).
 const SUMMARY_FIELDS = [
-  "Gender", "Vulnerability (observed)", "Difficulties", "Age Category", "Relationship to Area", "Trip Purpose",
-  "Walking Frequency", "Difficulty Walking / Steps / Crossing", "What Makes It Difficult", "Accompanying / Assisting",
-  "Mode Entering Area", "Entry Bus Terminal", "Entry Bus Route", "Mode Leaving Area", "Exit Bus Terminal", "Exit Bus Route", "Entry Facility", "Expected Exit Facility", "Route Choice Reasons",
-  "Walking Time in Area", "Used Underpass", "Underpass Available", "Why Underpass Not Used", "Barriers Experienced",
-  "Personal Safety Concerns", "Main Barrier", "Improvements Prioritised", "First Priority", "GPS Status"
+  "Gender", "Age Category", "Vulnerability (observed)", "Difficulties", "Trip Purpose", "Respondent / Trip Category",
+  "Accompanying / Assisting", "Walking Frequency", "Mode to Walk Start", "Start Bus Stand / Terminal", "Start Bus Route",
+  "Mode After Walk End", "End Bus Stand / Terminal", "End Bus Route", "Path Choice Reasons", "Walking Time (this trip)",
+  "Path Difficulties", "Personal Safety Concerns", "Main Difficulty", "Improvements Prioritised", "First Priority", "GPS Status"
 ];
 // "; "-separated multi-answer columns
 const MULTI_FIELDS = [
-  "Vulnerability (observed)", "Difficulties", "Relationship to Area", "What Makes It Difficult", "Accompanying / Assisting",
-  "Entry Facility", "Expected Exit Facility", "Route Choice Reasons", "Why Underpass Not Used", "Barriers Experienced",
+  "Vulnerability (observed)", "Difficulties", "Accompanying / Assisting", "Path Choice Reasons", "Path Difficulties",
   "Personal Safety Concerns", "Improvements Prioritised"
 ];
 const SEGMENT_COLUMN = "Date"; // Summary columns: one per survey date
@@ -133,8 +111,9 @@ function handleRequest(e) {
     for (const key in params) data[key] = params[key];
 
     const action = data.action;
-    // v2 = current app (bus terminal / route, notes); v1 is still accepted.
-    if (action === "submit_kmtt_v1" || action === "submit_kmtt_v2") return handleSubmitBatch(data);
+    // v3 = current app (revised questionnaire). Earlier versions are still
+    // accepted; fields they lack stay blank and retired fields are ignored.
+    if (/^submit_kmtt_v[1-3]$/.test(action || "")) return handleSubmitBatch(data);
     if (!action) return responseJson({ status: "success", message: "KMTT walkability survey backend is running." });
     return responseJson({ status: "error", message: "Invalid action" });
   } catch (error) {

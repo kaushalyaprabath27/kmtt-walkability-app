@@ -144,8 +144,14 @@ const FORM = [
     },
 
     // ---------------- B. This trip ----------------
-    { id: 'origin', section: 'This trip', label: 'Where did this trip start?', type: 'place', presets: true, cities: true, hint: 'Place / locality / landmark', placeholder: 'Start typing a location' },
-    { id: 'destination', label: 'What is your main destination on this trip?', type: 'place', presets: true, cities: true, hint: 'Place / locality / landmark', placeholder: 'Start typing a location' },
+    {
+        id: 'origin', section: 'This trip', label: 'Where did this walking trip start?', type: 'place', presets: true, nearby: true, recent: true, recentGroup: 'walkEnds',
+        hint: 'Place / landmark where they started walking', placeholder: 'Start typing a place or landmark'
+    },
+    {
+        id: 'destination', label: 'Where will this walking trip end?', type: 'place', presets: true, nearby: true, recent: true, recentGroup: 'walkEnds',
+        hint: 'Place / landmark where they will stop walking', placeholder: 'Start typing a place or landmark'
+    },
     {
         id: 'frequency', label: 'How often do you walk along this path?', type: 'single',
         options: ['Daily', 'Several days a week', 'About once a week', 'Less frequently', 'First visit']
@@ -231,8 +237,8 @@ const FORM = [
         showIf: a => answeredNot(a, 'pathDifficulties', 'None'), hint: 'Location / landmark', placeholder: 'Lane, junction or landmark'
     },
     {
-        id: 'improvements', label: 'Which improvements would you like on this walking path?', type: 'multi', other: true, grid: true, exclusive: 'None', max: 3,
-        hint: 'Select up to three', notes: 'Details in the respondent’s words (optional)',
+        id: 'improvements', label: 'Which improvements would you like on this walking path?', type: 'multi', other: true, grid: true, exclusive: 'None',
+        hint: 'Select all that apply', notes: 'Details in the respondent’s words (optional)',
         options: [
             ['Keep parked vehicles off the walking path', 'fa-ban'],
             ['Wider / continuous walking path', 'fa-arrows-left-right'],

@@ -158,7 +158,7 @@ const FORM = [
     },
     {
         id: 'startMode', label: 'How did you get to the start of this walking trip?', type: 'single', other: true, grid: true,
-        hint: 'The mode used just before walking', options: [['None', 'fa-person-walking']].concat(MODES)
+        hint: 'The mode used just before walking', options: [['Walked all the way', 'fa-person-walking']].concat(MODES)
     },
     // Bus stand and route: asked only when they came / will go by bus.
     {
@@ -172,7 +172,7 @@ const FORM = [
     },
     {
         id: 'endMode', label: 'How will you travel after the end of this walking trip?', type: 'single', other: true, grid: true,
-        hint: 'The mode used just after walking', options: [['None', 'fa-person-walking']].concat(MODES, [['Not yet decided', 'fa-circle-question']])
+        hint: 'The mode used just after walking', options: [['Will walk all the way', 'fa-person-walking']].concat(MODES, [['Not yet decided', 'fa-circle-question']])
     },
     {
         id: 'endBusTerminal', label: 'Which bus stand / terminal will you board at?', type: 'place', presets: true, nearby: true, recent: true, recentGroup: 'busTerminal',
@@ -233,10 +233,6 @@ const FORM = [
         showIf: a => answeredNot(a, 'pathDifficulties', 'None'), main: true
     },
     {
-        id: 'mainDifficultyLocation', label: 'Where on the path is it?', type: 'place', presets: true, nearby: true, recent: true, recentGroup: 'difficulty',
-        showIf: a => answeredNot(a, 'pathDifficulties', 'None'), hint: 'Location / landmark', placeholder: 'Lane, junction or landmark'
-    },
-    {
         id: 'improvements', label: 'Which improvements would you like on this walking path?', type: 'multi', other: true, grid: true, exclusive: 'None',
         hint: 'Select all that apply', notes: 'Details in the respondent’s words (optional)',
         options: [
@@ -249,8 +245,6 @@ const FORM = [
             ['Shade / covered walkway', 'fa-umbrella'],
             ['Ramps / accessible design', 'fa-wheelchair'],
             ['Keep the path clean', 'fa-broom'],
-            ['More pedestrian crossings', 'fa-person-walking'],
-            ['Signalised crossings', 'fa-traffic-light'],
             ['Slower traffic / traffic calming', 'fa-gauge-simple'],
             ['Seating / rest areas', 'fa-chair'],
             ['Signs / wayfinding', 'fa-signs-post'],
@@ -1625,7 +1619,6 @@ function buildRecord(fix, interviewId, ts) {
         pathDifficultiesNotes: notesValue('pathDifficulties'),
         safetyConcern: shown('safetyConcern') ? multiValue('safetyConcern') : '',
         mainDifficulty: shown('mainDifficulty') ? fromValue('mainDifficulty') : '',
-        ...placeCols('mainDifficultyLocation', 'mainDifficultyLocation'),
         improvements: multiValue('improvements'),
         improvementsNotes: notesValue('improvements'),
         firstPriority: fromValue('firstPriority')
